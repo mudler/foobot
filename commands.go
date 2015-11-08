@@ -2,13 +2,79 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
+	"math/rand"
+	"net/http"
+	"os"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/darthlukan/cakeday"
 	"github.com/darthlukan/goconvtemps"
 	"github.com/darthlukan/goduckgo/goduckgo"
-	"os"
-	"strconv"
-	"strings"
+	"github.com/freahs/microhal"
+	"github.com/thoj/go-ircevent"
 )
+
+// ParseCmds takes PRIVMSG strings containing a preceding bang "!"
+// and attempts to turn them into an ACTION that makes sense.
+// Returns a msg string.
+func ParseCmds(cmdMsg string, config *Config, conn *irc.Connection, e *irc.Event) string {
+	var (
+		msg      string
+		msgArray []string
+		cmdArray []string
+	)
+
+	cmdArray = strings.SplitAfterN(cmdMsg, config.Trigger, 2)
+
+	if len(cmdArray) > 0 {
+		msgArray = strings.SplitN(cmdArray[1], " ", 2)
+	}
+
+	if len(msgArray) > 1 {
+		cmd := fmt.Sprintf("%vs", msgArray[0])
+		switch {
+		case strings.Contains(cmd, "cakeday"):
+			msg = CakeDayCmd(msgArray[1])
+		case strings.Contains(cmd, "ddg"), strings.Contains(cmd, "search"):
+			query := strings.Join(msgArray[1:], " ")
+			msg = SearchCmd(query)
+		case strings.Contains(cmd, "convtemp"):
+			query := strings.Join(msgArray[1:], " ")
+			msg = ConvertTempCmd(query)
+		case strings.Contains(cmd, "rand"):
+			msg = GenericVerbCmd(cmd, msgArray[1])
+		case strings.Contains(cmd, "pkg"):
+			go SearchPkgsCmd(conn, e, strings.Join(msgArray[1:], " "), "SearchPackage")
+			msg = ""
+		case strings.Contains(cmd, "rdep"):
+			go SearchPkgsCmd(conn, e, strings.Join(msgArray[1:], " "), "SearchRevDeps")
+			msg = ""
+		default:
+			msg = GenericVerbCmd(cmd, msgArray[1])
+		}
+	} else {
+		switch {
+		case strings.Contains(msgArray[0], "help"):
+			msg = HelpCmd(config.Trigger)
+		case strings.Contains(msgArray[0], "wiki"):
+			msg = WikiCmd(config)
+		case strings.Contains(msgArray[0], "homepage"):
+			msg = HomePageCmd(config)
+		case strings.Contains(msgArray[0], "forums"):
+			msg = ForumCmd(config)
+		case strings.Contains(msgArray[0], "latestpkgs"):
+			go SearchPkgsCmd(conn, e, "", "SearchPackage")
+			msg = ""
+		default:
+			msg = ""
+		}
+	}
+	return msg
+}
 
 // GenericVerbCmd returns a message string based on the supplied cmd (a verb).
 func GenericVerbCmd(cmd, extra string) string {
@@ -76,8 +142,8 @@ func ConvertTempCmd(query string) string {
 }
 
 func HelpCmd(trigger string) string {
-	return fmt.Sprintf("Commands: %shelp, %sddg/search, %sconvtemp, %scakeday, %sVERB. Admins only: %squit\n",
-		trigger, trigger, trigger, trigger, trigger, trigger)
+	return fmt.Sprintf("Commands: %shelp, %sddg/search <whatever>, %sconvtemp <27C>, %scakeday <someone>, %srandom <whatever>, %slatestpkgs, %spkg <package>, %srdep <package>. (try to mention me eheheh) Admins only: %squit\n",
+		trigger, trigger, trigger, trigger, trigger, trigger, trigger, trigger, trigger)
 }
 
 func WikiCmd(config *Config) string {
@@ -98,4 +164,199 @@ func QuitCmd(admins []string, user string) {
 			os.Exit(0)
 		}
 	}
+}
+
+var quips = []string{
+	"FOR SCIENCE!",
+	"because... reasons.",
+	"it's super effective!",
+	"because... why not?",
+	"was it good for you?",
+	"given the alternative, yep, worth it!",
+	"don't ask...",
+	"then makes a sandwich.",
+	"oh noes!",
+	"did I do that?",
+	"why must you turn this place into a house of lies!",
+	"really???",
+	"LLLLEEEEEERRRRRROOOOYYYY JEEEENNNKINNNS!",
+	"DOH!",
+	"Giggity!",
+}
+
+func SearchPkgsCmd(conn *irc.Connection, e *irc.Event, s string, t string) {
+	max := 3
+	var search []Package
+	fmt.Println("WHAT?")
+	var query string
+	conn.Privmsg(e.Arguments[0], "Searching, be patient boy")
+	if t == "SearchPackage" {
+		if len(s) >= 2 {
+			search, query = SearchPackages(s)
+		} else {
+			search, query = SearchPackages("")
+		}
+	} else if t == "SearchRevDeps" {
+		if len(s) >= 2 {
+			search, query = ReverseDeps(s)
+		} else {
+			conn.Privmsg(e.Arguments[0], "Please, be more specific next time")
+			return
+		}
+	}
+	if len(search) == 0 {
+		conn.Privmsg(e.Arguments[0], "No results for "+query+" limited to "+strconv.Itoa(max)+" results")
+
+	} else {
+		conn.Privmsg(e.Arguments[0], "Showing the results limited to "+strconv.Itoa(max)+" for "+query)
+	}
+	if len(search) < max {
+		max = len(search)
+	}
+	for i := 0; i < max; i++ {
+		conn.Privmsg(e.Arguments[0], search[i].String())
+		time.Sleep(1000 * time.Millisecond)
+	}
+}
+
+func RandomQuip() string {
+	return quips[rand.Intn(len(quips))]
+}
+
+// UrlTitle attempts to extract the title of the page that a
+// pasted URL points to.
+// Returns a string message with the title and URL on success, or a string
+// with an error message on failure.
+func UrlTitle(msg string) string {
+	var (
+		newMsg, url, title, word string
+	)
+
+	regex, _ := regexp.Compile(`(?i)<title>(.*?)<\/title>`)
+
+	msgArray := strings.Split(msg, " ")
+
+	for _, word = range msgArray {
+		if strings.Contains(word, "http") {
+			url = word
+			break
+		}
+		if !strings.Contains(word, "http") && strings.Contains(word, "www") {
+			url = "http://" + word
+			break
+		}
+	}
+
+	resp, err := http.Get(url)
+
+	if err != nil {
+		return fmt.Sprintf("Could not resolve URL %v, beware...\n", url)
+	}
+
+	defer resp.Body.Close()
+
+	rawBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Sprintf("Could not read response Body of %v ...\n", url)
+	}
+
+	body := string(rawBody)
+	noNewLines := strings.Replace(body, "\n", "", -1)
+	noCarriageReturns := strings.Replace(noNewLines, "\r", "", -1)
+	notSoRawBody := noCarriageReturns
+
+	titleMatch := regex.FindStringSubmatch(notSoRawBody)
+	if len(titleMatch) > 1 {
+		title = strings.TrimSpace(titleMatch[1])
+	} else {
+		title = fmt.Sprintf("Title Resolution Failure")
+	}
+	newMsg = fmt.Sprintf("[ %v ]( %v )\n", title, url)
+
+	return newMsg
+}
+
+// AddCallbacks is a single function that does what it says.
+// It's merely a way of decluttering the main function.
+func AddCallbacks(conn *irc.Connection, config *Config) {
+	log := fmt.Sprintf("%s%s", config.LogDir, config.Channel)
+
+	conn.AddCallback("001", func(e *irc.Event) {
+		for _, channel := range config.Channel {
+			conn.Join(channel)
+		}
+	})
+
+	conn.AddCallback("JOIN", func(e *irc.Event) {
+		if e.Nick == config.BotNick {
+			//conn.Privmsg(config.Channel, "Hello everybody, I'm a bot")
+			LogDir(config.LogDir)
+			LogFile(config.LogDir + e.Arguments[0])
+		}
+		message := fmt.Sprintf("%s has joined", e.Nick)
+		go ChannelLogger(log, e.Nick, message)
+	})
+	conn.AddCallback("PART", func(e *irc.Event) {
+		message := fmt.Sprintf("has parted (%s)", e.Message())
+		nick := fmt.Sprintf("%s@%s", e.Nick, e.Host)
+		go ChannelLogger(log, nick, message)
+	})
+	conn.AddCallback("QUIT", func(e *irc.Event) {
+		message := fmt.Sprintf("has quit (%v)", e.Message)
+		nick := fmt.Sprintf("%s@%s", e.Nick, e.Host)
+		go ChannelLogger(log, nick, message)
+	})
+
+	if config.HalEnabled {
+		var brain *microhal.Microhal
+
+		if _, err := os.Stat(config.HalBrainFile); os.IsNotExist(err) {
+			brain = microhal.NewMicrohal(config.HalBrainFile, config.HalMarkovOrder)
+		} else {
+			brain = microhal.LoadMicrohal(config.HalBrainFile)
+		}
+
+		re, _ := regexp.Compile(config.BotNick + `\S`)
+		brainIn, brainOut := brain.Start(10000*time.Millisecond, 250)
+		conn.AddCallback("PRIVMSG", func(e *irc.Event) {
+			message := e.Message()
+			sanitizedInput := re.ReplaceAllLiteralString(message, "")
+			if !strings.HasPrefix(message, config.Trigger) && len(message) >= config.HalMarkovOrder {
+				brainIn <- sanitizedInput
+
+			}
+			res := <-brainOut
+			if strings.Contains(message, config.BotNick) {
+
+				conn.Privmsg(e.Arguments[0], res)
+
+			}
+		})
+
+	}
+
+	conn.AddCallback("PRIVMSG", func(e *irc.Event) {
+		var response string
+		message := e.Message()
+		if strings.Contains(message, config.Trigger) && strings.Index(message, config.Trigger) == 0 {
+			response = ParseCmds(message, config, conn, e)
+		}
+		if strings.Contains(message, "http://") || strings.Contains(message, "https://") || strings.Contains(message, "www.") {
+			response = UrlTitle(message)
+		}
+
+		if strings.Contains(message, fmt.Sprintf("%squit", config.Trigger)) {
+			QuitCmd(config.Admins, e.Nick)
+		}
+
+		if len(response) > 0 {
+			conn.Privmsg(e.Arguments[0], response)
+		}
+
+		if len(message) > 0 {
+			if e.Arguments[0] != config.BotNick {
+				go ChannelLogger(log, e.Nick+": ", message)
+			}
+		}
+	})
 }
