@@ -1,12 +1,16 @@
 {
-    "Admins": ["darthlukan"],
+    "Admins": ["mudler"],
     "Server": "irc.freenode.net:6667",
-    "Channel": "#evolveos",
-    "BotUser": "Gobot",
-    "BotNick": "Gobot",
+    "Channel": ["#sabayon"],
+    "BotUser": "foobot",
+    "BotNick": "foobot",
     "Trigger": "!",
-    "LogDir": "/tmp/gobot/",
-    "WikiLink": "https://evolve-os.com/wiki",
-    "Homepage": "https://evolve-os.com/",
-    "Forums": "https://evolve-os.com/forums"
+    "LogDir": "/tmp/foobot/",
+    "WikiLink": "https://wiki.sabayon.org",
+    "Homepage": "https://www.sabayon.org",
+    "Forums": "https://forum.sabayon.org",
+    "HalEnabled": true,
+    "HalBrainFile": "brain",
+    "HalMarkovOrder": 4,
+    "Debug": true
 }
