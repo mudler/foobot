@@ -187,7 +187,6 @@ var quips = []string{
 func SearchPkgsCmd(conn *irc.Connection, e *irc.Event, s string, t string) {
 	max := 3
 	var search []Package
-	fmt.Println("WHAT?")
 	var query string
 	conn.Privmsg(e.Arguments[0], "Searching, be patient boy")
 	if t == "SearchPackage" {
@@ -310,26 +309,26 @@ func AddCallbacks(conn *irc.Connection, config *Config) {
 	if config.HalEnabled {
 		var brain *microhal.Microhal
 
-		if _, err := os.Stat(config.HalBrainFile); os.IsNotExist(err) {
+		if _, err := os.Stat(config.HalBrainFile + ".json"); os.IsNotExist(err) {
 			brain = microhal.NewMicrohal(config.HalBrainFile, config.HalMarkovOrder)
 		} else {
 			brain = microhal.LoadMicrohal(config.HalBrainFile)
 		}
 
-		re, _ := regexp.Compile(config.BotNick + `\S`)
+		re, _ := regexp.Compile(config.BotNick)
 		brainIn, brainOut := brain.Start(10000*time.Millisecond, 250)
 		conn.AddCallback("PRIVMSG", func(e *irc.Event) {
 			message := e.Message()
 			sanitizedInput := re.ReplaceAllLiteralString(message, "")
 			if !strings.HasPrefix(message, config.Trigger) && len(message) >= config.HalMarkovOrder {
 				brainIn <- sanitizedInput
-
-			}
-			res := <-brainOut
-			if strings.Contains(message, config.BotNick) {
-
-				conn.Privmsg(e.Arguments[0], res)
-
+				res := <-brainOut
+				if sanitizedInput != message {
+					conn.Privmsg(e.Arguments[0], res)
+				}
+			} else if len(message) >= config.HalMarkovOrder {
+				brainIn <- sanitizedInput
+				_ = <-brainOut
 			}
 		})
 
