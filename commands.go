@@ -278,7 +278,6 @@ func UrlTitle(msg string) string {
 // AddCallbacks is a single function that does what it says.
 // It's merely a way of decluttering the main function.
 func AddCallbacks(conn *irc.Connection, config *Config) {
-	log := fmt.Sprintf("%s%s", config.LogDir, config.Channel)
 
 	conn.AddCallback("001", func(e *irc.Event) {
 		for _, channel := range config.Channel {
@@ -293,17 +292,17 @@ func AddCallbacks(conn *irc.Connection, config *Config) {
 			LogFile(config.LogDir + e.Arguments[0])
 		}
 		message := fmt.Sprintf("%s has joined", e.Nick)
-		go ChannelLogger(log, e.Nick, message)
+		go ChannelLogger(e.Arguments[0], e.Nick, message)
 	})
 	conn.AddCallback("PART", func(e *irc.Event) {
 		message := fmt.Sprintf("has parted (%s)", e.Message())
 		nick := fmt.Sprintf("%s@%s", e.Nick, e.Host)
-		go ChannelLogger(log, nick, message)
+		go ChannelLogger(e.Arguments[0], nick, message)
 	})
 	conn.AddCallback("QUIT", func(e *irc.Event) {
 		message := fmt.Sprintf("has quit (%v)", e.Message)
 		nick := fmt.Sprintf("%s@%s", e.Nick, e.Host)
-		go ChannelLogger(log, nick, message)
+		go ChannelLogger(e.Arguments[0], nick, message)
 	})
 
 	if config.HalEnabled {
@@ -354,7 +353,7 @@ func AddCallbacks(conn *irc.Connection, config *Config) {
 
 		if len(message) > 0 {
 			if e.Arguments[0] != config.BotNick {
-				go ChannelLogger(log, e.Nick+": ", message)
+				go ChannelLogger(e.Arguments[0], e.Nick+": ", message)
 			}
 		}
 	})
