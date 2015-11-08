@@ -292,17 +292,17 @@ func AddCallbacks(conn *irc.Connection, config *Config) {
 			LogFile(config.LogDir + e.Arguments[0])
 		}
 		message := fmt.Sprintf("%s has joined", e.Nick)
-		go ChannelLogger(e.Arguments[0], e.Nick, message)
+		go ChannelLogger(config.LogDir+e.Arguments[0], e.Nick, message)
 	})
 	conn.AddCallback("PART", func(e *irc.Event) {
 		message := fmt.Sprintf("has parted (%s)", e.Message())
 		nick := fmt.Sprintf("%s@%s", e.Nick, e.Host)
-		go ChannelLogger(e.Arguments[0], nick, message)
+		go ChannelLogger(config.LogDir+e.Arguments[0], nick, message)
 	})
 	conn.AddCallback("QUIT", func(e *irc.Event) {
 		message := fmt.Sprintf("has quit (%v)", e.Message)
 		nick := fmt.Sprintf("%s@%s", e.Nick, e.Host)
-		go ChannelLogger(e.Arguments[0], nick, message)
+		go ChannelLogger(config.LogDir+e.Arguments[0], nick, message)
 	})
 
 	if config.HalEnabled {
@@ -353,7 +353,7 @@ func AddCallbacks(conn *irc.Connection, config *Config) {
 
 		if len(message) > 0 {
 			if e.Arguments[0] != config.BotNick {
-				go ChannelLogger(e.Arguments[0], e.Nick+": ", message)
+				go ChannelLogger(config.LogDir+e.Arguments[0], e.Nick+": ", message)
 			}
 		}
 	})
