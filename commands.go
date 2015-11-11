@@ -145,7 +145,6 @@ func ConvertTempCmd(query string) string {
 }
 
 func HelpCmd(conn *irc.Connection, e *irc.Event, trigger string) {
-	conn.Privmsg(e.Arguments[0], "Available commands:")
 	conn.Privmsg(e.Arguments[0], "General info: "+trigger+"forum,  "+trigger+"homepage,  "+trigger+"wiki,  "+trigger+"bugs")
 	conn.Privmsg(e.Arguments[0], "Sabayon Entropy store search: "+trigger+"latestpkgs (show you latest packages), "+trigger+"pkg <package> (search for a package), "+trigger+"rdep <package> (reverse dependency of a package)")
 	conn.Privmsg(e.Arguments[0], "Various utils: "+trigger+"ddg/search <whatever>, "+trigger+"convtemp <27C>, "+trigger+"cakeday <someone>, "+trigger+"random <whatever>, ")
@@ -294,9 +293,10 @@ func AddCallbacks(conn *irc.Connection, config *Config) {
 	})
 
 	if config.Welcome {
-
 		conn.AddCallback("JOIN", func(e *irc.Event) {
-			conn.Privmsg(e.Arguments[0], config.WelcomeMessage)
+			if e.Nick != config.BotNick {
+				conn.Privmsg(e.Arguments[0], config.WelcomeMessage)
+			}
 		})
 	}
 
