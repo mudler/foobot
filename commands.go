@@ -59,13 +59,16 @@ func ParseCmds(cmdMsg string, config *Config, conn *irc.Connection, e *irc.Event
 	} else {
 		switch {
 		case strings.Contains(msgArray[0], "help"):
-			msg = HelpCmd(config.Trigger)
+			HelpCmd(conn, e, config.Trigger)
+			msg = ""
 		case strings.Contains(msgArray[0], "wiki"):
 			msg = WikiCmd(config)
 		case strings.Contains(msgArray[0], "homepage"):
 			msg = HomePageCmd(config)
-		case strings.Contains(msgArray[0], "forums"):
+		case strings.Contains(msgArray[0], "forum"):
 			msg = ForumCmd(config)
+		case strings.Contains(msgArray[0], "bugs"):
+			msg = BugsCmd(config)
 		case strings.Contains(msgArray[0], "latestpkgs"):
 			go SearchPkgsCmd(conn, e, "", "SearchPackage")
 			msg = ""
@@ -141,21 +144,26 @@ func ConvertTempCmd(query string) string {
 	return fmt.Sprintf("%v is %v.\n", strings.ToUpper(input), converted)
 }
 
-func HelpCmd(trigger string) string {
-	return fmt.Sprintf("Commands: %shelp, %sddg/search <whatever>, %sconvtemp <27C>, %scakeday <someone>, %srandom <whatever>, %slatestpkgs, %spkg <package>, %srdep <package>. (try to mention me eheheh) Admins only: %squit\n",
-		trigger, trigger, trigger, trigger, trigger, trigger, trigger, trigger, trigger)
+func HelpCmd(conn *irc.Connection, e *irc.Event, trigger string) {
+	conn.Privmsg(e.Arguments[0], "Available commands:")
+	conn.Privmsg(e.Arguments[0], "General info: "+trigger+"forum,  "+trigger+"homepage,  "+trigger+"wiki,  "+trigger+"bugs")
+	conn.Privmsg(e.Arguments[0], "Sabayon Entropy store search: "+trigger+"latestpkgs (show you latest packages), "+trigger+"pkg <package> (search for a package), "+trigger+"rdep <package> (reverse dependency of a package)")
+	conn.Privmsg(e.Arguments[0], "Various utils: "+trigger+"ddg/search <whatever>, "+trigger+"convtemp <27C>, "+trigger+"cakeday <someone>, "+trigger+"random <whatever>, ")
 }
 
 func WikiCmd(config *Config) string {
-	return fmt.Sprintf("(Channel Wiki)[ %s ]\n", config.WikiLink)
+	return fmt.Sprintf("(Wiki)[ %s ]\n", config.WikiLink)
 }
 
 func HomePageCmd(config *Config) string {
-	return fmt.Sprintf("(Channel Homepage)[ %s ]\n", config.Homepage)
+	return fmt.Sprintf("(Homepage)[ %s ]\n", config.Homepage)
 }
 
 func ForumCmd(config *Config) string {
-	return fmt.Sprintf("(Channel Forums)[ %s ]\n", config.Forums)
+	return fmt.Sprintf("(Forums)[ %s ]\n", config.Forums)
+}
+func BugsCmd(config *Config) string {
+	return fmt.Sprintf("(Bugs)[ %s ]\n", config.Bugs)
 }
 
 func QuitCmd(admins []string, user string) {
@@ -285,9 +293,18 @@ func AddCallbacks(conn *irc.Connection, config *Config) {
 		}
 	})
 
+	if config.Welcome {
+
+		conn.AddCallback("JOIN", func(e *irc.Event) {
+			conn.Privmsg(e.Arguments[0], config.WelcomeMessage)
+		})
+	}
+
 	conn.AddCallback("JOIN", func(e *irc.Event) {
 		if e.Nick == config.BotNick {
-			//conn.Privmsg(config.Channel, "Hello everybody, I'm a bot")
+			if config.MessageOnJoin {
+				conn.Privmsg(e.Arguments[0], config.JoinMessage)
+			}
 			LogDir(config.LogDir)
 			LogFile(config.LogDir + e.Arguments[0])
 		}

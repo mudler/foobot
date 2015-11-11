@@ -12,8 +12,13 @@ type Config struct {
 	WikiLink       string
 	Homepage       string
 	Forums         string
+	Bugs           string
 	HalBrainFile   string
 	HalEnabled     bool
 	HalMarkovOrder int
 	Debug          bool
+	Welcome        bool
+	WelcomeMessage string
+	JoinMessage    string
+	MessageOnJoin  bool
 }

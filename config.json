@@ -12,5 +12,9 @@
     "HalEnabled": true,
     "HalBrainFile": "brain",
     "HalMarkovOrder": 4,
-    "Debug": true
+    "Debug": true,
+    "Welcome" : true,
+    "WelcomeMessage": "Welcome to bla bla!",
+    "MessageOnJoin": true,
+    "JoinMessage": "Hello everybody, i'll try to do my best to be useful!"
 }

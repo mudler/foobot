@@ -4,8 +4,9 @@ GoBot
 An IRC bot written in Go.
 
 Copyright (C) 2014  Brian C. Tomlinson
+Copyright (C) 2015  Ettore Di Giacinto
 
-Contact: brian.tomlinson@linux.com
+Contact: mudler@sabayon.org
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -54,6 +55,8 @@ func main() {
 	config := &Config{}
 	config.HalEnabled = false
 	config.HalMarkovOrder = 4
+	config.MessageOnJoin = false
+	config.Welcome = false
 	config.Debug = false
 	decoder.Decode(&config)
 
