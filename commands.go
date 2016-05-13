@@ -351,27 +351,31 @@ func AddCallbacks(conn *irc.Connection, config *Config) {
 	}
 
 	conn.AddCallback("PRIVMSG", func(e *irc.Event) {
-		var response string
-		message := e.Message()
-		if strings.Contains(message, config.Trigger) && strings.Index(message, config.Trigger) == 0 {
-			response = ParseCmds(message, config, conn, e)
-		}
-		if strings.Contains(message, "http://") || strings.Contains(message, "https://") || strings.Contains(message, "www.") {
-			response = UrlTitle(message)
-		}
-
-		if strings.Contains(message, fmt.Sprintf("%squit", config.Trigger)) {
-			QuitCmd(config.Admins, e.Nick)
-		}
-
-		if len(response) > 0 {
-			conn.Privmsg(e.Arguments[0], response)
-		}
-
-		if len(message) > 0 {
-			if e.Arguments[0] != config.BotNick {
-				go ChannelLogger(config.LogDir+e.Arguments[0], e.Nick+": ", message)
+		go func(event *irc.Event) {
+			var response string
+			message := e.Message()
+			if strings.Contains(message, config.Trigger) && strings.Index(message, config.Trigger) == 0 {
+				response = ParseCmds(message, config, conn, e)
 			}
-		}
+			if strings.Contains(message, "http://") || strings.Contains(message, "https://") || strings.Contains(message, "www.") {
+				if !strings.Contains(message, "git.io") {
+					response = UrlTitle(message)
+				}
+			}
+
+			if strings.Contains(message, fmt.Sprintf("%squit", config.Trigger)) {
+				QuitCmd(config.Admins, e.Nick)
+			}
+
+			if len(response) > 0 {
+				conn.Privmsg(e.Arguments[0], response)
+			}
+
+			if len(message) > 0 {
+				if e.Arguments[0] != config.BotNick {
+					go ChannelLogger(config.LogDir+e.Arguments[0], e.Nick+": ", message)
+				}
+			}
+		}(e)
 	})
 }
